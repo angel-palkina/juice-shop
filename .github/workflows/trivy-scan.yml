@@ -22,18 +22,14 @@ jobs:
     - name: Install dependencies
       run: npm install
 
-    - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
-      with:
-        scan-type: 'fs'
-        scan-ref: '.'
-        format: 'sarif'
-        output: 'trivy-results.sarif'
-        severity: 'CRITICAL,HIGH,MEDIUM'
-
-    - name: Run Trivy with HTML report
+    - name: Install Trivy
       run: |
-        trivy fs . --format template --template "@/contrib/html.tpl" --output trivy-report.html --severity CRITICAL,HIGH,MEDIUM
+        curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+        trivy --version
+
+    - name: Run Trivy scan and generate HTML report
+      run: |
+        trivy fs . --format html --output trivy-report.html --severity CRITICAL,HIGH,MEDIUM --skip-db-update
 
     - name: Upload Trivy HTML report
       uses: actions/upload-artifact@v4
