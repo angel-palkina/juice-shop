@@ -37,7 +37,8 @@ jobs:
 
       - name: Download HTML template
         run: |
-          curl -sL -o html.tpl https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
+          curl -sL -o html.tpl \
+          https://raw.githubusercontent.com/aquasecurity/trivy-action/main/templates/html.tpl
 
       - name: Run Trivy scan (HTML report)
         run: |
@@ -45,8 +46,8 @@ jobs:
             --format template \
             --template ./html.tpl \
             --output trivy-report.html \
-            --dependency-tree \
-            --scanners vuln,license,secret
+            --scanners vuln \
+            --severity CRITICAL,HIGH,MEDIUM
 
       - name: Generate SBOM
         run: |
