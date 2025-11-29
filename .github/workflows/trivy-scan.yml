@@ -10,7 +10,6 @@ jobs:
   trivy-scan:
     runs-on: ubuntu-latest
 
-    # Принудительно использовать свежие версии actions и отключить кеширование старых
     env:
       ACTIONS_ALLOW_USE_UNSECURED_NODE_VERSION: true
       ACTIONS_RUNNER_FORCE_ACTIONS_PREVIEW: true
@@ -31,28 +30,28 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"   # Juice Shop требует >=22 для libxmljs2
+          node-version: "22"
 
       # -----------------------------
-      # 3. Установка Angular CLI
+      # 3. Install Angular CLI
       # -----------------------------
       - name: Install Angular CLI
         run: npm install -g @angular/cli
 
       # -----------------------------
-      # 4. Установка зависимостей
+      # 4. Install dependencies
       # -----------------------------
       - name: Install dependencies
         run: npm install
 
       # -----------------------------
-      # 5. Генерация lock file
+      # 5. Generate lock file
       # -----------------------------
       - name: Generate lock file
         run: npm install --package-lock-only
 
       # -----------------------------
-      # 6. Установка Trivy
+      # 6. Install Trivy
       # -----------------------------
       - name: Install Trivy
         run: |
@@ -61,15 +60,21 @@ jobs:
           trivy --version
 
       # -----------------------------
-      # 7. Скачать рабочий HTML шаблон
+      # 7. Download correct HTML template
       # -----------------------------
       - name: Download HTML template
         run: |
           curl -sL -o html.tpl \
-          https://raw.githubusercontent.com/aquasecurity/trivy-action/main/templates/html.tpl
+          https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
 
       # -----------------------------
-      # 8. Запуск сканирования для HTML отчёта
+      # 8. Verify HTML template
+      # -----------------------------
+      - name: Verify template
+        run: head -n 10 html.tpl
+
+      # -----------------------------
+      # 9. Run Trivy scan (HTML report)
       # -----------------------------
       - name: Run Trivy scan (HTML report)
         run: |
@@ -81,14 +86,14 @@ jobs:
             --severity CRITICAL,HIGH,MEDIUM
 
       # -----------------------------
-      # 9. Генерация SBOM
+      # 10. Generate SBOM
       # -----------------------------
       - name: Generate SBOM
         run: |
           trivy fs . --format cyclonedx --output sbom.json
 
       # -----------------------------
-      # 10. Загрузка HTML отчёта
+      # 11. Upload HTML report
       # -----------------------------
       - name: Upload HTML Report
         uses: actions/upload-artifact@v4
@@ -97,7 +102,7 @@ jobs:
           path: trivy-report.html
 
       # -----------------------------
-      # 11. Загрузка SBOM
+      # 12. Upload SBOM
       # -----------------------------
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
