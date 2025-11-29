@@ -2,9 +2,9 @@ name: Trivy Dependency Scanning
 
 on:
   push:
-    branches: [ "master", "main" ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ "master", "main" ]
+    branches: [ "main" ]
 
 jobs:
   trivy-scan:
@@ -12,34 +12,24 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # -----------------------------
       # 1. Устанавливаем Node.js
       # -----------------------------
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "20"
 
       # -----------------------------
-      # 2. Создать lock-файл для backend
+      # 2. Создать lock-файлы
       # -----------------------------
-      - name: Generate top-level lock file
+      - name: Generate lock file
         run: npm install --package-lock-only
 
       # -----------------------------
-      # 3. Создать lock-файл для frontend (если есть)
-      # -----------------------------
-      - name: Generate frontend lock file
-        run: |
-          if [ -d "frontend" ]; then
-            cd frontend
-            npm install --package-lock-only
-          fi
-
-      # -----------------------------
-      # 4. Установка Trivy
+      # 3. Установка Trivy
       # -----------------------------
       - name: Install Trivy
         run: |
@@ -49,7 +39,14 @@ jobs:
           sudo dpkg -i trivy_0.52.1_Linux-64bit.deb
 
       # -----------------------------
-      # 5. Генерация HTML-отчёта
+      # 4. Скачать HTML шаблон
+      # -----------------------------
+      - name: Download HTML template
+        run: |
+          curl -sL -o html.tpl https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
+
+      # -----------------------------
+      # 5. Генерация HTML отчёта
       # -----------------------------
       - name: Run Trivy scan (HTML report)
         run: |
@@ -61,23 +58,23 @@ jobs:
             --scanners vuln,license,secret
 
       # -----------------------------
-      # 6. Генерация SBOM (CycloneDX)
+      # 6. Генерация SBOM
       # -----------------------------
       - name: Generate SBOM
         run: |
           trivy fs . --format cyclonedx --output sbom.json
 
       # -----------------------------
-      # 7. Публикация артефактов
+      # 7. Загрузка артефактов (v4!)
       # -----------------------------
-      - name: Upload Report
-        uses: actions/upload-artifact@v3
+      - name: Upload HTML Report
+        uses: actions/upload-artifact@v4
         with:
           name: trivy-report
           path: trivy-report.html
 
       - name: Upload SBOM
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: sbom
           path: sbom.json
