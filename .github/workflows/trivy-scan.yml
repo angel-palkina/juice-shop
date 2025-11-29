@@ -24,16 +24,24 @@ jobs:
 
     - name: Install Trivy
       run: |
-        curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+        curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | \
+          sh -s -- -b /usr/local/bin
         trivy --version
 
-    - name: Generate SBOM from package.json
+    - name: Download HTML template
       run: |
-        trivy fs . --scanners license --format cyclonedx --output sbom.json
+        curl -sL -o html.tpl https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
 
-    - name: Scan for vulnerabilities in dependencies
+    - name: Scan project for vulnerabilities (JS deps)
       run: |
-        trivy fs . --scanners vuln --format template --template html.tpl --output trivy-report.html --severity CRITICAL,HIGH,MEDIUM
+        trivy fs . \
+          --format template --template ./html.tpl \
+          --output trivy-report.html \
+          --severity CRITICAL,HIGH,MEDIUM
+
+    - name: Generate SBOM for entire project
+      run: |
+        trivy fs . --format cyclonedx --output sbom.json
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
