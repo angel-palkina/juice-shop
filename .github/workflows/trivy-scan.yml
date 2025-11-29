@@ -14,23 +14,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # -----------------------------
-      # 1. Устанавливаем Node.js
-      # -----------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"   # ВАЖНО — Juice Shop требует 22 для libxmljs2!
 
-      # -----------------------------
-      # 2. Создать lock-файлы
-      # -----------------------------
+      - name: Install Angular CLI
+        run: npm install -g @angular/cli
+
+      - name: Install dependencies
+        run: npm install
+
       - name: Generate lock file
         run: npm install --package-lock-only
 
-      # -----------------------------
-      # 3. Установка Trivy
-      # -----------------------------
       - name: Install Trivy
         run: |
           sudo apt-get update
@@ -38,16 +35,10 @@ jobs:
           wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.52.1_Linux-64bit.deb
           sudo dpkg -i trivy_0.52.1_Linux-64bit.deb
 
-      # -----------------------------
-      # 4. Скачать HTML шаблон
-      # -----------------------------
       - name: Download HTML template
         run: |
           curl -sL -o html.tpl https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
 
-      # -----------------------------
-      # 5. Генерация HTML отчёта
-      # -----------------------------
       - name: Run Trivy scan (HTML report)
         run: |
           trivy fs . \
@@ -57,16 +48,10 @@ jobs:
             --dependency-tree \
             --scanners vuln,license,secret
 
-      # -----------------------------
-      # 6. Генерация SBOM
-      # -----------------------------
       - name: Generate SBOM
         run: |
           trivy fs . --format cyclonedx --output sbom.json
 
-      # -----------------------------
-      # 7. Загрузка артефактов (v4!)
-      # -----------------------------
       - name: Upload HTML Report
         uses: actions/upload-artifact@v4
         with:
