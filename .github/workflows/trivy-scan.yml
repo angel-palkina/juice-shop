@@ -1,53 +1,83 @@
-name: Trivy Security Scan
+name: Trivy Dependency Scanning
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "master", "main" ]
   pull_request:
-    branches: [ main ]
+    branches: [ "master", "main" ]
 
 jobs:
   trivy-scan:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
+      # -----------------------------
+      # 1. Устанавливаем Node.js
+      # -----------------------------
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
 
-    - name: Install dependencies
-      run: npm install
+      # -----------------------------
+      # 2. Создать lock-файл для backend
+      # -----------------------------
+      - name: Generate top-level lock file
+        run: npm install --package-lock-only
 
-    - name: Install Trivy
-      run: |
-        curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | \
-          sh -s -- -b /usr/local/bin
-        trivy --version
+      # -----------------------------
+      # 3. Создать lock-файл для frontend (если есть)
+      # -----------------------------
+      - name: Generate frontend lock file
+        run: |
+          if [ -d "frontend" ]; then
+            cd frontend
+            npm install --package-lock-only
+          fi
 
-    - name: Download HTML template
-      run: |
-        curl -sL -o html.tpl https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
+      # -----------------------------
+      # 4. Установка Trivy
+      # -----------------------------
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget
+          wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.52.1_Linux-64bit.deb
+          sudo dpkg -i trivy_0.52.1_Linux-64bit.deb
 
-    - name: Scan project for vulnerabilities (JS deps)
-      run: |
-        trivy fs . \
-          --format template --template ./html.tpl \
-          --output trivy-report.html \
-          --severity CRITICAL,HIGH,MEDIUM
+      # -----------------------------
+      # 5. Генерация HTML-отчёта
+      # -----------------------------
+      - name: Run Trivy scan (HTML report)
+        run: |
+          trivy fs . \
+            --format template \
+            --template ./html.tpl \
+            --output trivy-report.html \
+            --dependency-tree \
+            --scanners vuln,license,secret
 
-    - name: Generate SBOM for entire project
-      run: |
-        trivy fs . --format cyclonedx --output sbom.json
+      # -----------------------------
+      # 6. Генерация SBOM (CycloneDX)
+      # -----------------------------
+      - name: Generate SBOM
+        run: |
+          trivy fs . --format cyclonedx --output sbom.json
 
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: security-reports
-        path: |
-          trivy-report.html
-          sbom.json
-        retention-days: 30
+      # -----------------------------
+      # 7. Публикация артефактов
+      # -----------------------------
+      - name: Upload Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: trivy-report
+          path: trivy-report.html
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v3
+        with:
+          name: sbom
+          path: sbom.json
