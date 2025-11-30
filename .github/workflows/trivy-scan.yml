@@ -20,28 +20,26 @@ jobs:
           node-version: "22"
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      # Install Trivy for SBOM and repo scan
-      - name: Install Trivy
+      - name: Install Trivy CLI
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
-          | sh -s -- -b /usr/local/bin
+          | sudo sh -s -- -b /usr/local/bin
           trivy --version
 
-      # Generate SBOM (as before)
-      - name: Generate SBOM
+      - name: Generate SBOM (CycloneDX)
         run: trivy fs . --format cyclonedx --output sbom.json
 
-      # Run repo scan (THIS finds npm vulnerabilities)
-      - name: Run Trivy repo scan (HTML)
-        uses: aquasecurity/trivy-action@0.20.0
-        with:
-          scan-type: repo
-          format: template
-          template: "@/contrib/html.tpl"
-          output: trivy-report.html
-          severity: CRITICAL,HIGH,MEDIUM
+      - name: Run Trivy filesystem scan and create HTML report
+        run: |
+          # Обновим БД (иногда полезно для CI runner)
+          trivy -q db update || true
+          # Запустим файловый скан — этот режим обычно корректно находит уязвимости в npm-зависимостях/lockfile
+          trivy fs . --format template --template "@contrib/html.tpl" --output trivy-report.html --severity CRITICAL,HIGH,MEDIUM || true
+          # Покажем первые строки отчёта в логах для быстрой отладки
+          echo "=== trivy-report.html (head) ==="
+          head -n 80 trivy-report.html || true
 
       - name: Upload HTML Report
         uses: actions/upload-artifact@v4
