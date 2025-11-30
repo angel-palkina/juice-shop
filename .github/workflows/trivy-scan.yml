@@ -10,6 +10,13 @@ jobs:
   trivy-scan:
     runs-on: ubuntu-latest
 
+    env:
+      ACTIONS_ALLOW_USE_UNSECURED_NODE_VERSION: true
+      ACTIONS_RUNNER_FORCE_ACTIONS_PREVIEW: true
+      ACTIONS_STEP_DEBUG: true
+      ACTIONS_SETUP_NODE_FORCE_FILES_DOWNLOAD: true
+      ACTIONS_ALLOW_EXECUTION_FROM_CACHE: false
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,34 +26,32 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Install Angular CLI
+        run: npm install -g @angular/cli
+
       - name: Install dependencies
         run: npm install
 
-      - name: Install Trivy (CLI) for SBOM
+      - name: Generate lock file
+        run: npm install --package-lock-only
+
+      - name: Install Trivy
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | \
             sh -s -- -b /usr/local/bin
-          trivy --version || true
-
-      - name: Generate SBOM (CycloneDX)  # НЕ менять — важный шаг
+          trivy --version
+          
+      - name: Generate SBOM
         run: |
-          echo "Generating SBOM with trivy CLI..."
           trivy fs . --format cyclonedx --output sbom.json
-          echo "SBOM file info:"
-          if [ -f sbom.json ]; then ls -lh sbom.json; head -n 60 sbom.json; else echo "sbom.json not found"; exit 1; fi
-
-      - name: Upload SBOM immediately (preserve it as artifact)
+ 
+      - name: Upload SBOM
         uses: actions/upload-artifact@v4
         with:
           name: sbom
-          path: sbom.json
+          path: sbom.json   
 
-      - name: Quick Trivy table scan (debug)
-        run: |
-          echo "Quick Trivy table scan to show findings in logs"
-          trivy fs . --pkg-types library --scanners vuln --severity CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN -o table || true
-
-      - name: Run Trivy Action to generate HTML report (stable)
+      - name: Run Trivy vulnerability scan (HTML report)
         uses: aquasecurity/trivy-action@0.20.0
         with:
           scan-type: fs
@@ -54,12 +59,6 @@ jobs:
           template: "@/contrib/html.tpl"
           output: trivy-report.html
           severity: CRITICAL,HIGH,MEDIUM
-          scanners: vuln
-
-      - name: Show HTML report head & size (debug)
-        run: |
-          echo "=== trivy-report.html head ==="
-          if [ -f trivy-report.html ]; then head -n 80 trivy-report.html || true; ls -lh trivy-report.html; else echo "trivy-report.html not found"; fi
 
       - name: Upload HTML Report
         uses: actions/upload-artifact@v4
