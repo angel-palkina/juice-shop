@@ -10,92 +10,38 @@ jobs:
   trivy-scan:
     runs-on: ubuntu-latest
 
-    env:
-      ACTIONS_ALLOW_USE_UNSECURED_NODE_VERSION: true
-      ACTIONS_RUNNER_FORCE_ACTIONS_PREVIEW: true
-      ACTIONS_STEP_DEBUG: true
-      ACTIONS_SETUP_NODE_FORCE_FILES_DOWNLOAD: true
-      ACTIONS_ALLOW_EXECUTION_FROM_CACHE: false
-
     steps:
-      # -----------------------------
-      # 1. Checkout repository
-      # -----------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # -----------------------------
-      # 2. Setup Node.js
-      # -----------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
 
-      # -----------------------------
-      # 3. Install Angular CLI
-      # -----------------------------
       - name: Install Angular CLI
         run: npm install -g @angular/cli
 
-      # -----------------------------
-      # 4. Install dependencies
-      # -----------------------------
       - name: Install dependencies
         run: npm install
 
-      # -----------------------------
-      # 5. Verify dependencies
-      # -----------------------------
-      - name: Verify dependencies
-        run: ls -l node_modules
-
-      # -----------------------------
-      # 6. Install Trivy
-      # -----------------------------
-      - name: Install Trivy
-        run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | \
-            sh -s -- -b /usr/local/bin
-          trivy --version
-
-      # -----------------------------
-      # 7. Download correct HTML template
-      # -----------------------------
-      - name: Download HTML template
-        run: |
-          curl -sL -o html.tpl \
-          https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
-
-      # -----------------------------
-      # 8. Verify HTML template
-      # -----------------------------
-      - name: Verify template
-        run: head -n 10 html.tpl
-
-      # -----------------------------
-      # 9. Run Trivy scan (HTML report)
-      # -----------------------------
-      - name: Run Trivy scan (HTML report)
-        run: |
-          trivy fs . \
-            --format template \
-            --template ./html.tpl \
-            --output trivy-report.html \
-            --scanners vuln \
-            --severity CRITICAL,HIGH,MEDIUM \
-            --ignore-unfixed \
-            --no-progress
-
-      # -----------------------------
-      # 10. Generate SBOM
-      # -----------------------------
       - name: Generate SBOM
-        run: |
-          trivy fs . --format cyclonedx --output sbom.json
+        run: trivy fs . --format cyclonedx --output sbom.json
 
       # -----------------------------
-      # 11. Upload HTML report
+      #  Trivy HTML report through trivy-action
+      # -----------------------------
+      - name: Run Trivy vulnerability scan (HTML report)
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: fs
+          format: template
+          template: "@/contrib/html.tpl"
+          output: trivy-report.html
+          severity: CRITICAL,HIGH,MEDIUM
+
+      # -----------------------------
+      # Upload reports
       # -----------------------------
       - name: Upload HTML Report
         uses: actions/upload-artifact@v4
@@ -103,9 +49,6 @@ jobs:
           name: trivy-report
           path: trivy-report.html
 
-      # -----------------------------
-      # 12. Upload SBOM
-      # -----------------------------
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
         with:
