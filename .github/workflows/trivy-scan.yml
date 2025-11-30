@@ -26,17 +26,16 @@ jobs:
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | \
             sh -s -- -b /usr/local/bin
-          trivy --version
+          trivy --version || true
 
-      - name: Generate SBOM (CycloneDX)  # НЕ менять — важно
+      - name: Generate SBOM (CycloneDX)  # НЕ менять — важный шаг
         run: |
           echo "Generating SBOM with trivy CLI..."
           trivy fs . --format cyclonedx --output sbom.json
-          echo "SBOM generation exit code: $?"
           echo "SBOM file info:"
-          if [ -f sbom.json ]; then ls -lh sbom.json; head -n 120 sbom.json | sed -n '1,60p'; else echo "sbom.json not found"; exit 1; fi
+          if [ -f sbom.json ]; then ls -lh sbom.json; head -n 60 sbom.json; else echo "sbom.json not found"; exit 1; fi
 
-      - name: Upload SBOM immediately (guarantee it's preserved)
+      - name: Upload SBOM immediately (preserve it as artifact)
         uses: actions/upload-artifact@v4
         with:
           name: sbom
@@ -44,7 +43,7 @@ jobs:
 
       - name: Quick Trivy table scan (debug)
         run: |
-          echo "Quick Trivy table scan (shows findings in logs)"
+          echo "Quick Trivy table scan to show findings in logs"
           trivy fs . --pkg-types library --scanners vuln --severity CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN -o table || true
 
       - name: Run Trivy Action to generate HTML report (stable)
