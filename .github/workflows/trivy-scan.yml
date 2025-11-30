@@ -11,58 +11,71 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Setup Node.js (если нужно для сборки/зависимостей)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
 
-      - name: Install dependencies
-        run: npm install
+      # 3. Install Angular CLI (если нужен)
+      - name: Install Angular CLI
+        run: npm install -g @angular/cli
 
-      - name: Install Trivy CLI
+      # 4. Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # 5. (Опционально) Generate lock file if you need it
+      - name: Generate lock file
+        run: npm install --package-lock-only
+
+      # 6. Install Trivy CLI
+      - name: Install Trivy
         run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
-            | sudo sh -s -- -b /usr/local/bin
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | \
+            sh -s -- -b /usr/local/bin
           trivy --version
 
-      - name: Prepare HTML template for Trivy
+      # 7. Download HTML template (в рабочую директорию)
+      - name: Download HTML template
         run: |
-          # Ensure contrib dir and fetch the html.tpl that Trivy examples reference
-          mkdir -p contrib
-          curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl -o contrib/html.tpl
-          echo "Template downloaded:"
-          ls -l contrib/html.tpl || true
+          curl -sL -o html.tpl \
+            https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
+          echo "Template saved to $(pwd)/html.tpl"
+          head -n 5 html.tpl
 
-      - name: Quick Trivy check (table) — shows vulnerabilities in console for debug
+      # 8. Run Trivy vulnerability scan (HTML report)
+      - name: Run Trivy scan (HTML report)
         run: |
-          # Use --pkg-types npm (modern alias instead of deprecated --vuln-type)
-          trivy fs . --pkg-types npm --severity CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN -o table || true
-
-      - name: Generate HTML report (Trivy template)
-        run: |
+          # IMPORTANT: use @ prefix to tell Trivy that this is a file path
           trivy fs . \
-            --pkg-types npm \
             --format template \
-            --template "./contrib/html.tpl" \
+            --template @./html.tpl \
             --output trivy-report.html \
-            --severity CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN || true
-          echo "=== trivy-report.html (head) ==="
-          head -n 80 trivy-report.html || true
-          echo "=== trivy-report.html size ==="
-          if [ -f trivy-report.html ]; then ls -lh trivy-report.html; else echo "trivy-report.html not found"; fi
+            --scanners vuln \
+            --severity CRITICAL,HIGH,MEDIUM
 
+      # 9. Generate SBOM (CycloneDX)
+      - name: Generate SBOM (CycloneDX)
+        run: |
+          trivy fs . --format cyclonedx --output sbom.json
+
+      # 10. Basic sanity: list generated files
+      - name: List generated reports
+        run: ls -la trivy-report.html sbom.json || true
+
+      # 11. Upload HTML Report
       - name: Upload HTML Report
         uses: actions/upload-artifact@v4
         with:
           name: trivy-report
           path: trivy-report.html
 
-      - name: Generate SBOM (CycloneDX)
-        run: trivy fs . --format cyclonedx --output sbom.json || true
-
+      # 12. Upload SBOM
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
         with:
