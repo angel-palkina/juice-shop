@@ -11,25 +11,41 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
 
+      # 3. Angular CLI
       - name: Install Angular CLI
         run: npm install -g @angular/cli
 
+      # 4. Install dependencies
       - name: Install dependencies
         run: npm install
 
+      # -----------------------------
+      # 5. Install Trivy (для SBOM)
+      # -----------------------------
+      - name: Install Trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+          | sh -s -- -b /usr/local/bin
+          trivy --version
+
+      # -----------------------------
+      # 6. SBOM (как у тебя изначально работало)
+      # -----------------------------
       - name: Generate SBOM
         run: trivy fs . --format cyclonedx --output sbom.json
 
       # -----------------------------
-      #  Trivy HTML report through trivy-action
+      # 7. Trivy Action → HTML отчёт
       # -----------------------------
       - name: Run Trivy vulnerability scan (HTML report)
         uses: aquasecurity/trivy-action@0.20.0
@@ -41,7 +57,7 @@ jobs:
           severity: CRITICAL,HIGH,MEDIUM
 
       # -----------------------------
-      # Upload reports
+      # 8. Upload HTML Report
       # -----------------------------
       - name: Upload HTML Report
         uses: actions/upload-artifact@v4
@@ -49,6 +65,9 @@ jobs:
           name: trivy-report
           path: trivy-report.html
 
+      # -----------------------------
+      # 9. Upload SBOM
+      # -----------------------------
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
         with:
