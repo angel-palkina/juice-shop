@@ -20,7 +20,7 @@ jobs:
           node-version: "22"
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Install Trivy CLI
         run: |
@@ -33,11 +33,9 @@ jobs:
 
       - name: Run Trivy filesystem scan and create HTML report
         run: |
-          # Обновим БД (иногда полезно для CI runner)
           trivy -q db update || true
-          # Запустим файловый скан — этот режим обычно корректно находит уязвимости в npm-зависимостях/lockfile
+          # Сканируем filesystem — это смотрит в node_modules и lockfile
           trivy fs . --format template --template "@contrib/html.tpl" --output trivy-report.html --severity CRITICAL,HIGH,MEDIUM || true
-          # Покажем первые строки отчёта в логах для быстрой отладки
           echo "=== trivy-report.html (head) ==="
           head -n 80 trivy-report.html || true
 
