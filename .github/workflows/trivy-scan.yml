@@ -25,25 +25,28 @@ jobs:
       - name: Install Trivy CLI
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
-          | sudo sh -s -- -b /usr/local/bin
+            | sudo sh -s -- -b /usr/local/bin
           trivy --version
 
-      - name: Generate SBOM (CycloneDX)
-        run: trivy fs . --format cyclonedx --output sbom.json
-
-      - name: Run Trivy filesystem scan (table) for quick debug
+      - name: Prepare HTML template for Trivy
         run: |
-          trivy -q db update || true
-          # Быстрый вывод в консоль (таблица) — сразу видно, находит ли Trivy что-нибудь
-          trivy fs . --vuln-type library --severity CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN -o table || true
+          # Ensure contrib dir and fetch the html.tpl that Trivy examples reference
+          mkdir -p contrib
+          curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl -o contrib/html.tpl
+          echo "Template downloaded:"
+          ls -l contrib/html.tpl || true
 
-      - name: Run Trivy filesystem scan and create HTML report
+      - name: Quick Trivy check (table) — shows vulnerabilities in console for debug
         run: |
-          trivy -q db update || true
+          # Use --pkg-types npm (modern alias instead of deprecated --vuln-type)
+          trivy fs . --pkg-types npm --severity CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN -o table || true
+
+      - name: Generate HTML report (Trivy template)
+        run: |
           trivy fs . \
-            --vuln-type library \
+            --pkg-types npm \
             --format template \
-            --template "@contrib/html.tpl" \
+            --template "./contrib/html.tpl" \
             --output trivy-report.html \
             --severity CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN || true
           echo "=== trivy-report.html (head) ==="
@@ -56,6 +59,9 @@ jobs:
         with:
           name: trivy-report
           path: trivy-report.html
+
+      - name: Generate SBOM (CycloneDX)
+        run: trivy fs . --format cyclonedx --output sbom.json || true
 
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
