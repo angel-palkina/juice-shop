@@ -31,13 +31,25 @@ jobs:
       - name: Generate SBOM (CycloneDX)
         run: trivy fs . --format cyclonedx --output sbom.json
 
+      - name: Run Trivy filesystem scan (table) for quick debug
+        run: |
+          trivy -q db update || true
+          # Быстрый вывод в консоль (таблица) — сразу видно, находит ли Trivy что-нибудь
+          trivy fs . --vuln-type library --severity CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN -o table || true
+
       - name: Run Trivy filesystem scan and create HTML report
         run: |
           trivy -q db update || true
-          # Сканируем filesystem — это смотрит в node_modules и lockfile
-          trivy fs . --format template --template "@contrib/html.tpl" --output trivy-report.html --severity CRITICAL,HIGH,MEDIUM || true
+          trivy fs . \
+            --vuln-type library \
+            --format template \
+            --template "@contrib/html.tpl" \
+            --output trivy-report.html \
+            --severity CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN || true
           echo "=== trivy-report.html (head) ==="
           head -n 80 trivy-report.html || true
+          echo "=== trivy-report.html size ==="
+          if [ -f trivy-report.html ]; then ls -lh trivy-report.html; else echo "trivy-report.html not found"; fi
 
       - name: Upload HTML Report
         uses: actions/upload-artifact@v4
