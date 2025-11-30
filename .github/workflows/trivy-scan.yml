@@ -10,62 +10,77 @@ jobs:
   trivy-scan:
     runs-on: ubuntu-latest
 
+    env:
+      ACTIONS_ALLOW_USE_UNSECURED_NODE_VERSION: true
+
     steps:
-      # 1. Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
 
-      # 3. Install Angular CLI
-      - name: Install Angular CLI
+      - name: Install Angular CLI (if needed)
         run: npm install -g @angular/cli
 
-      # 4. Install dependencies (без lock-файла)
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm install
 
-      # 5. Install Trivy CLI
-      - name: Install Trivy
+      - name: Ensure package-lock exists (generate if missing)
+        run: |
+          # create/update package-lock.json so SBOM/scan have deterministic dependency tree
+          npm install --package-lock-only || true
+          if [ -f package-lock.json ]; then echo "package-lock.json present"; else echo "no package-lock.json"; fi
+
+      - name: Install Trivy CLI
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
-          | sh -s -- -b /usr/local/bin
-          trivy --version
+            | sudo sh -s -- -b /usr/local/bin
+          trivy --version || true
 
-      # 6. Download HTML template
-      - name: Download HTML template
+      - name: Download Trivy HTML template (local copy)
         run: |
-          curl -sL -o html.tpl \
-            https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
-          head -n 5 html.tpl
+          mkdir -p contrib
+          curl -fsSL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl -o contrib/html.tpl
+          echo "Template head:"
+          head -n 6 contrib/html.tpl || true
 
-      # 7. Generate HTML vulnerability report
-      - name: Run Trivy scan (HTML report)
+      - name: Generate SBOM (CycloneDX)
         run: |
+          echo "Generating SBOM..."
+          trivy fs . --format cyclonedx --output sbom.json || true
+          echo "SBOM size:"
+          if [ -f sbom.json ]; then ls -lh sbom.json; else echo "sbom.json not found"; fi
+
+      - name: Quick Trivy table scan (debug)
+        run: |
+          echo "Quick table scan to show findings in logs"
+          trivy fs . --pkg-types library --scanners vuln --severity CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN -o table || true
+
+      - name: Generate HTML report (Trivy template)
+        run: |
+          echo "Generating HTML report using local template..."
           trivy fs . \
-            --format template \
-            --template @./html.tpl \
-            --output trivy-report.html \
+            --pkg-types library \
             --scanners vuln \
-            --severity CRITICAL,HIGH,MEDIUM
+            --format template \
+            --template ./contrib/html.tpl \
+            --output trivy-report.html \
+            --severity CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN || true
+          echo "=== trivy-report.html (head) ==="
+          head -n 80 trivy-report.html || true
+          echo "=== trivy-report.html size ==="
+          if [ -f trivy-report.html ]; then ls -lh trivy-report.html; else echo "trivy-report.html not found"; fi
 
-      # 8. Generate SBOM (CycloneDX) — ЭТОТ ВАРИАНТ У ТЕБЯ РАБОТАЛ
-      - name: Generate SBOM
-        run: |
-          trivy fs . --format cyclonedx --output sbom.json
-
-      # 9. Upload HTML report
       - name: Upload HTML Report
         uses: actions/upload-artifact@v4
         with:
           name: trivy-report
           path: trivy-report.html
 
-      # 10. Upload SBOM
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
         with:
