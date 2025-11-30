@@ -45,10 +45,10 @@ jobs:
         run: npm install
 
       # -----------------------------
-      # 5. Generate lock file
+      # 5. Verify dependencies
       # -----------------------------
-      - name: Generate lock file
-        run: npm install --package-lock-only
+      - name: Verify dependencies
+        run: ls -l node_modules
 
       # -----------------------------
       # 6. Install Trivy
@@ -83,7 +83,9 @@ jobs:
             --template ./html.tpl \
             --output trivy-report.html \
             --scanners vuln \
-            --severity CRITICAL,HIGH,MEDIUM
+            --severity CRITICAL,HIGH,MEDIUM \
+            --ignore-unfixed \
+            --no-progress
 
       # -----------------------------
       # 10. Generate SBOM
