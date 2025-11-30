@@ -15,43 +15,38 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Setup Node.js (если нужно для сборки/зависимостей)
+      # 2. Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
 
-      # 3. Install Angular CLI (если нужен)
+      # 3. Install Angular CLI
       - name: Install Angular CLI
         run: npm install -g @angular/cli
 
-      # 4. Install dependencies
+      # 4. Install dependencies (no lock-file)
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
-      # 5. (Опционально) Generate lock file if you need it
-      - name: Generate lock file
-        run: npm install --package-lock-only
-
-      # 6. Install Trivy CLI
+      # 5. Install Trivy
       - name: Install Trivy
         run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | \
-            sh -s -- -b /usr/local/bin
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+          | sh -s -- -b /usr/local/bin
           trivy --version
 
-      # 7. Download HTML template (в рабочую директорию)
+      # 6. Download HTML template
       - name: Download HTML template
         run: |
           curl -sL -o html.tpl \
             https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
-          echo "Template saved to $(pwd)/html.tpl"
           head -n 5 html.tpl
 
-      # 8. Run Trivy vulnerability scan (HTML report)
+      # 7. Run Trivy scan (HTML report)
       - name: Run Trivy scan (HTML report)
         run: |
-          # IMPORTANT: use @ prefix to tell Trivy that this is a file path
+          # ВАЖНО: нужен префикс @ чтобы указать путь к файлу
           trivy fs . \
             --format template \
             --template @./html.tpl \
@@ -59,23 +54,19 @@ jobs:
             --scanners vuln \
             --severity CRITICAL,HIGH,MEDIUM
 
-      # 9. Generate SBOM (CycloneDX)
+      # 8. Generate SBOM
       - name: Generate SBOM (CycloneDX)
         run: |
           trivy fs . --format cyclonedx --output sbom.json
 
-      # 10. Basic sanity: list generated files
-      - name: List generated reports
-        run: ls -la trivy-report.html sbom.json || true
-
-      # 11. Upload HTML Report
+      # 9. Upload HTML Report
       - name: Upload HTML Report
         uses: actions/upload-artifact@v4
         with:
           name: trivy-report
           path: trivy-report.html
 
-      # 12. Upload SBOM
+      # 10. Upload SBOM
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
         with:
