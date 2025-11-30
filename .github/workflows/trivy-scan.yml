@@ -25,11 +25,11 @@ jobs:
       - name: Install Angular CLI
         run: npm install -g @angular/cli
 
-      # 4. Install dependencies (no lock-file)
+      # 4. Install dependencies (без lock-файла)
       - name: Install dependencies
         run: npm install
 
-      # 5. Install Trivy
+      # 5. Install Trivy CLI
       - name: Install Trivy
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
@@ -43,10 +43,9 @@ jobs:
             https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/html.tpl
           head -n 5 html.tpl
 
-      # 7. Run Trivy scan (HTML report)
+      # 7. Generate HTML vulnerability report
       - name: Run Trivy scan (HTML report)
         run: |
-          # ВАЖНО: нужен префикс @ чтобы указать путь к файлу
           trivy fs . \
             --format template \
             --template @./html.tpl \
@@ -54,12 +53,12 @@ jobs:
             --scanners vuln \
             --severity CRITICAL,HIGH,MEDIUM
 
-      # 8. Generate SBOM
-      - name: Generate SBOM (CycloneDX)
+      # 8. Generate SBOM (CycloneDX) — ЭТОТ ВАРИАНТ У ТЕБЯ РАБОТАЛ
+      - name: Generate SBOM
         run: |
           trivy fs . --format cyclonedx --output sbom.json
 
-      # 9. Upload HTML Report
+      # 9. Upload HTML report
       - name: Upload HTML Report
         uses: actions/upload-artifact@v4
         with:
