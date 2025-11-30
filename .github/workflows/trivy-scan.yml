@@ -19,35 +19,38 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Install Angular CLI (if needed)
-        run: npm install -g @angular/cli
-
       - name: Install dependencies
         run: npm install
 
-      # ----- KEEP SBOM STEP (unchanged behavior) -----
       - name: Install Trivy (CLI) for SBOM
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | \
             sh -s -- -b /usr/local/bin
           trivy --version
 
-      - name: Generate SBOM (CycloneDX)  # <- не менять, это важно
+      - name: Generate SBOM (CycloneDX)  # НЕ менять — важно
         run: |
+          echo "Generating SBOM with trivy CLI..."
           trivy fs . --format cyclonedx --output sbom.json
+          echo "SBOM generation exit code: $?"
+          echo "SBOM file info:"
+          if [ -f sbom.json ]; then ls -lh sbom.json; head -n 120 sbom.json | sed -n '1,60p'; else echo "sbom.json not found"; exit 1; fi
 
-      - name: Show SBOM info
+      - name: Upload SBOM immediately (guarantee it's preserved)
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
+
+      - name: Quick Trivy table scan (debug)
         run: |
-          echo "SBOM size and head:"
-          if [ -f sbom.json ]; then ls -lh sbom.json; head -n 120 sbom.json | sed -n '1,60p'; else echo "sbom.json not found"; fi
+          echo "Quick Trivy table scan (shows findings in logs)"
+          trivy fs . --pkg-types library --scanners vuln --severity CRITICAL,HIGH,MEDIUM,LOW,UNKNOWN -o table || true
 
-      # ----- Use official trivy-action to generate HTML report (stable) -----
-      - name: Run Trivy Action to generate HTML report
+      - name: Run Trivy Action to generate HTML report (stable)
         uses: aquasecurity/trivy-action@0.20.0
         with:
-          # filesystem scan (same target as trivy fs .)
           scan-type: fs
-          # render with template (action knows how to resolve "@/contrib/html.tpl")
           format: template
           template: "@/contrib/html.tpl"
           output: trivy-report.html
@@ -64,9 +67,3 @@ jobs:
         with:
           name: trivy-report
           path: trivy-report.html
-
-      - name: Upload SBOM
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom
-          path: sbom.json
